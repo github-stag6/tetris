@@ -8,12 +8,17 @@
   canvas { background: #2b2d42; border: 3px solid #8d99ae; border-radius: 6px; }
   #info { margin-bottom: 10px; font-size: 20px; }
   #msg { margin-top: 10px; font-size: 16px; color: #ffd166; }
+  #player { margin-top: 10px; font-size: 16px; }
+  #board { margin-top: 16px; border-collapse: collapse; font-size: 16px; min-width: 260px; }
+  #board th, #board td { padding: 4px 12px; border-bottom: 1px solid #8d99ae; text-align: left; }
 </style>
 </head>
 <body>
 <div id="info">Score : <span id="score">0</span></div>
 <canvas id="game" width="400" height="400"></canvas>
 <div id="msg">Flèches pour jouer</div>
+<label id="player">Pseudo : <input id="name" type="text" maxlength="20" value="Joueur"></label>
+<table id="board"></table>
 <script>
 const CELLS = 20;
 const SIZE = 20;
@@ -23,6 +28,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const msgEl = document.getElementById('msg');
+const nameEl = document.getElementById('name');
+const boardEl = document.getElementById('board');
 
 let cat, dir, next, mice, score, over, started, timer;
 
@@ -56,6 +63,7 @@ function init() {
   for (let i = 0; i < MICE; i++) mice.push(spawnMouse());
   scoreEl.textContent = score;
   msgEl.textContent = 'Flèches pour démarrer';
+  renderBoard();
   draw();
 }
 
@@ -81,9 +89,33 @@ function tick() {
   timer = setTimeout(tick, speed());
 }
 
+function loadScores() {
+  try { return JSON.parse(localStorage.getItem('tetris-scores')) || []; } catch (e) { return []; }
+}
+
+function saveScore() {
+  const scores = loadScores();
+  scores.push({ name: nameEl.value.trim() || 'Anonyme', score: score });
+  scores.sort((a, b) => b.score - a.score);
+  scores.splice(10);
+  localStorage.setItem('tetris-scores', JSON.stringify(scores));
+  renderBoard(scores);
+}
+
+function renderBoard(scores = loadScores()) {
+  boardEl.replaceChildren();
+  const head = boardEl.insertRow();
+  ['Rang', 'Pseudo', 'Score'].forEach(t => { const th = document.createElement('th'); th.textContent = t; head.appendChild(th); });
+  scores.forEach((s, i) => {
+    const row = boardEl.insertRow();
+    [i + 1, s.name, s.score].forEach(v => { row.insertCell().textContent = v; });
+  });
+}
+
 function endGame() {
   over = true;
   msgEl.textContent = 'Perdu ! Score final : ' + score + '. Entrée pour rejouer.';
+  saveScore();
   draw();
 }
 
@@ -106,6 +138,7 @@ function draw() {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.target === nameEl) return;
   const moves = {
     ArrowUp: { x: 0, y: -1 },
     ArrowDown: { x: 0, y: 1 },
