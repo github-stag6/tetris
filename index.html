@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Les chats attrapent les souris</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1e1e2e; color: #f5f5f5; font-family: sans-serif; }
+  canvas { background: #2b2d42; border: 3px solid #8d99ae; border-radius: 6px; }
+  #info { margin-bottom: 10px; font-size: 20px; }
+  #msg { margin-top: 10px; font-size: 16px; color: #ffd166; }
+</style>
+</head>
+<body>
+<div id="info">Score : <span id="score">0</span></div>
+<canvas id="game" width="400" height="400"></canvas>
+<div id="msg">Flèches pour jouer</div>
+<script>
+const CELLS = 20;
+const SIZE = 20;
+const MICE = 3;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const msgEl = document.getElementById('msg');
+
+let cat, dir, next, mice, score, over, started, timer;
+
+function randCell() {
+  return { x: Math.floor(Math.random() * CELLS), y: Math.floor(Math.random() * CELLS) };
+}
+
+function isFree(p) {
+  return !cat.some(c => c.x === p.x && c.y === p.y) && !mice.some(m => m.x === p.x && m.y === p.y);
+}
+
+function spawnMouse() {
+  let p;
+  do { p = randCell(); } while (!isFree(p));
+  return p;
+}
+
+function speed() {
+  return Math.max(90, 200 - score * 3);
+}
+
+function init() {
+  clearTimeout(timer);
+  cat = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+  dir = { x: 1, y: 0 };
+  next = { x: 1, y: 0 };
+  score = 0;
+  over = false;
+  started = false;
+  mice = [];
+  for (let i = 0; i < MICE; i++) mice.push(spawnMouse());
+  scoreEl.textContent = score;
+  msgEl.textContent = 'Flèches pour démarrer';
+  draw();
+}
+
+function tick() {
+  dir = next;
+  const head = { x: cat[0].x + dir.x, y: cat[0].y + dir.y };
+  const hitWall = head.x < 0 || head.y < 0 || head.x >= CELLS || head.y >= CELLS;
+  const hitSelf = cat.some(c => c.x === head.x && c.y === head.y);
+  if (hitWall || hitSelf) {
+    endGame();
+    return;
+  }
+  cat.unshift(head);
+  const idx = mice.findIndex(m => m.x === head.x && m.y === head.y);
+  if (idx >= 0) {
+    mice[idx] = spawnMouse();
+    score++;
+    scoreEl.textContent = score;
+  } else {
+    cat.pop();
+  }
+  draw();
+  timer = setTimeout(tick, speed());
+}
+
+function endGame() {
+  over = true;
+  msgEl.textContent = 'Perdu ! Score final : ' + score + '. Entrée pour rejouer.';
+  draw();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  mice.forEach(m => ctx.fillText('🐭', m.x * SIZE + SIZE / 2, m.y * SIZE + SIZE / 2));
+
+  cat.forEach((c, i) => {
+    if (i === 0) {
+      ctx.fillText('🐱', c.x * SIZE + SIZE / 2, c.y * SIZE + SIZE / 2);
+    } else {
+      ctx.fillStyle = '#90be6d';
+      ctx.fillRect(c.x * SIZE + 2, c.y * SIZE + 2, SIZE - 4, SIZE - 4);
+    }
+  });
+}
+
+document.addEventListener('keydown', e => {
+  const moves = {
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 }
+  };
+  if (moves[e.key]) {
+    e.preventDefault();
+    const m = moves[e.key];
+    if (over || (m.x === -dir.x && m.y === -dir.y)) return;
+    next = m;
+    if (!started) {
+      started = true;
+      msgEl.textContent = '';
+      tick();
+    }
+  } else if ((e.key === 'Enter' || e.key === ' ') && over) {
+    init();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
