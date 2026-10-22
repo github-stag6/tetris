@@ -23,6 +23,8 @@
 const CELLS = 20;
 const SIZE = 20;
 const MICE = 3;
+const MOUSE_DELAY = 40;
+const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -31,7 +33,7 @@ const msgEl = document.getElementById('msg');
 const nameEl = document.getElementById('name');
 const boardEl = document.getElementById('board');
 
-let cat, dir, next, mice, score, over, started, timer;
+let cat, dir, next, mice, score, over, started, timer, mouseTimer;
 
 function randCell() {
   return { x: Math.floor(Math.random() * CELLS), y: Math.floor(Math.random() * CELLS) };
@@ -47,12 +49,45 @@ function spawnMouse() {
   return p;
 }
 
+function isOpen(p, self) {
+  return p.x >= 0 && p.y >= 0 && p.x < CELLS && p.y < CELLS
+    && !cat.some(c => c.x === p.x && c.y === p.y)
+    && !mice.some(o => o !== self && o.x === p.x && o.y === p.y);
+}
+
+function catchMouse(i) {
+  mice[i] = spawnMouse();
+  score++;
+  scoreEl.textContent = score;
+}
+
+function stepMouse(m, i) {
+  const head = cat[0];
+  const dist = p => Math.abs(p.x - head.x) + Math.abs(p.y - head.y);
+  const options = DIRS.map(d => ({ x: m.x + d.x, y: m.y + d.y })).filter(p => isOpen(p, m));
+  if (options.length === 0) {
+    if (dist(m) === 1) catchMouse(i);
+    return;
+  }
+  const far = Math.max(...options.map(dist));
+  const best = options.filter(p => dist(p) === far);
+  Object.assign(m, best[Math.floor(Math.random() * best.length)]);
+}
+
+function moveLoop() {
+  if (over) return;
+  mice.forEach((m, i) => { if (Math.random() < 0.5) stepMouse(m, i); });
+  draw();
+  mouseTimer = setTimeout(moveLoop, MOUSE_DELAY);
+}
+
 function speed() {
   return Math.max(90, 200 - score * 3);
 }
 
 function init() {
   clearTimeout(timer);
+  clearTimeout(mouseTimer);
   cat = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
   dir = { x: 1, y: 0 };
   next = { x: 1, y: 0 };
@@ -79,9 +114,7 @@ function tick() {
   cat.unshift(head);
   const idx = mice.findIndex(m => m.x === head.x && m.y === head.y);
   if (idx >= 0) {
-    mice[idx] = spawnMouse();
-    score++;
-    scoreEl.textContent = score;
+    catchMouse(idx);
   } else {
     cat.pop();
   }
@@ -114,6 +147,7 @@ function renderBoard(scores = loadScores()) {
 
 function endGame() {
   over = true;
+  clearTimeout(mouseTimer);
   msgEl.textContent = 'Perdu ! Score final : ' + score + '. Entrée pour rejouer.';
   saveScore();
   draw();
@@ -154,6 +188,7 @@ document.addEventListener('keydown', e => {
       started = true;
       msgEl.textContent = '';
       tick();
+      moveLoop();
     }
   } else if ((e.key === 'Enter' || e.key === ' ') && over) {
     init();
